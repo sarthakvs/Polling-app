@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Create and Manage Polls</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background-color: #f5f5f5;
+      margin: 0;
+      padding: 0;
+    }
+
+    .navbar {
+      background: purple;
+      color: white;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 10px 20px;
+    }
+
+    .navbar a {
+      text-decoration: none;
+      color: white;
+      margin: 0 10px;
+    }
+
+    .container {
+      max-width: 600px;
+      margin: 0 auto;
+      padding: 20px;
+      background-color: #fff;
+      border-radius: 5px;
+      box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+    }
+
+    .poll-form {
+      margin-bottom: 20px;
+    }
+
+    .poll-form label {
+      font-weight: bold;
+    }
+
+    .poll-options {
+      display: grid;
+      gap: 10px;
+    }
+
+    .poll-options label {
+      font-weight: normal;
+    }
+
+    .poll-options input {
+      padding: 10px;
+      border: 1px solid #ccc;
+      border-radius: 5px;
+    }
+
+    .add-option-button {
+      background-color: #007BFF;
+      color: #fff;
+      border: none;
+      border-radius: 5px;
+      padding: 10px 20px;
+      cursor: pointer;
+    }
+
+    .add-option-button:hover {
+      background-color: #0056b3;
+    }
+
+    .create-poll-button {
+      background-color: #28a745;
+      color: #fff;
+      border: none;
+      border-radius: 5px;
+      padding: 10px 20px;
+      cursor: pointer;
+    }
+
+    .create-poll-button:hover {
+      background-color: #1d9237;
+    }
+
+    .poll-list {
+      margin-top: 20px;
+    }
+
+    .delete-button {
+      color: red;
+      cursor: pointer;
+      font-weight: bold;
+    }
+
+    .delete-button:hover {
+      text-decoration: underline;
+    }
+
+    .start-voting-button, .clear-stats-button {
+      background-color: #007BFF;
+      color: #fff;
+      border: none;
+      border-radius: 5px;
+      padding: 5px 10px;
+      cursor: pointer;
+      margin-right: 10px;
+    }
+
+    .start-voting-button:hover, .clear-stats-button:hover {
+      background-color: #0056b3;
+    }
+  </style>
+</head>
+<body>
+  <div class="navbar">
+    <div>Polling App Group8</div>
+    <p>Welcome to our Application</p>
+  </div>
+
+  <div class="container">
+    <h1>Create a New Poll</h1>
+    <form class="poll-form">
+      <label for="question">Poll Question:</label>
+      <input type="text" id="question" name="question" required>
+      <label for="options"><p>Poll Options:</p></label>
+      <div class="poll-options">
+        <input type="text" name="options" required>
+        <input type="text" name="options" required>
+        <!-- Add more input fields for options as needed -->
+      </div>
+      <button type="button" class="add-option-button" id="addOption">Add Option</button>
+      <button type="button" class="create-poll-button" id="createPoll">Create Poll</button>
+    </form>
+    <hr>
+    <h2>Manage Polls</h2>
+    <div class="poll-list" id="pollList"></div>
+  </div>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      const createPollButton = document.getElementById('createPoll');
+      const pollList = document.getElementById('pollList');
+      
+      // Function to fetch and display existing polls with percentages
+      const displayPolls = async () => {
+        pollList.innerHTML = ''; // Clear the list before populating
+        
+        try {
+          const response = await fetch('/api/polls');
+          if (!response.ok) {
+            const data = await response.json();
+            throw new Error(`Error: ${data.error}`);
+          }
+
+          const pollsData = await response.json();
+
+          pollsData.forEach(poll => {
+            const pollItem = document.createElement('div');
+            const optionsHTML = poll.options.map((option, index) => {
+              const voteCount = poll.voteCounts[index] || 0;
+              const votePercentage = ((voteCount / poll.totalVotes) * 100).toFixed(2);
+              return `<p>${option} - Votes: ${voteCount} (${votePercentage}%)</p>`;
+            }).join('');
+            pollItem.innerHTML = `
+              <h3>${poll.question}</h3>
+              ${optionsHTML}
+              <button class="start-voting-button" data-poll-id="${poll._id}">Start Voting</button>
+              <button class="clear-stats-button" data-poll-id="${poll._id}">Clear Stats</button>
+              <button class="delete-button" data-poll-id="${poll._id}">Delete</button>
+            `;
+            pollList.appendChild(pollItem);
+          });
+
+        } catch (error) {
+          alert(error.message);
+        }
+      };
+
+      createPollButton.addEventListener('click', async () => {
+        const question = document.getElementById('question').value;
+        const options = Array.from(document.querySelectorAll('.poll-options input'))
+          .map(input => input.value);
+        
+        const response = await fetch('/api/polls', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ question, options }) // Sending JSON data here
+        });
+
+        if (response.ok) {
+          await displayPolls();
+          const poll = await response.json();
+          alert('Poll created successfully!');
+          window.open(`/vote.html?pollId=${poll._id}`, '_blank');
+        } else {
+          const data = await response.json();
+          alert(`Error: ${data.error}`);
+        }        
+      });
+    
+      const addOptionButton = document.getElementById('addOption');
+      const pollOptionsContainer = document.querySelector('.poll-options');
+      addOptionButton.addEventListener('click', () => {
+        const optionInput = document.createElement('input');
+        optionInput.type = 'text';
+        optionInput.name = 'options';
+        optionInput.required = true;
+        pollOptionsContainer.appendChild(optionInput);
+      });
+    
+      // Attach event listeners for start voting, clear stats, and delete buttons
+      pollList.addEventListener('click', async event => {
+        if (event.target.classList.contains('start-voting-button')) {
+          const pollId = event.target.getAttribute('data-poll-id');
+          window.open(`/vote.html?pollId=${pollId}`, '_blank');
+        } else if (event.target.classList.contains('clear-stats-button')) {
+          const pollId = event.target.getAttribute('data-poll-id');
+          if (confirm('Are you sure you want to clear the stats for this poll?')) {
+            await clearStats(pollId);
+          }
+        } else if (event.target.classList.contains('delete-button')) {
+          const pollId = event.target.getAttribute('data-poll-id');
+          if (confirm('Are you sure you want to delete this poll?')) {
+            await deletePoll(pollId);
+          }
+        }
+      });
+    
+      // Function to clear the stats for a poll
+      const clearStats = async pollId => {
+        try {
+          const response = await fetch(`/api/clear/${pollId}`, {
+            method: 'PUT'
+          });
+    
+          if (response.ok) {
+            await displayPolls(); // Update the displayed polls after clearing stats
+            alert('Stats cleared successfully!');
+          } else {
+            try {
+              const data = await response.json();
+              alert(`Error: ${data.error}`);
+            } catch (error) {
+              alert('Error parsing the response JSON.');
+            }
+          }
+        } catch (error) {
+          alert(error.message);
+        }
+      };
+    
+      // Function to delete a poll
+      const deletePoll = async pollId => {
+        try {
+          const response = await fetch(`/api/polls/${pollId}`, {
+            method: 'DELETE'
+          });
+    
+          if (response.ok) {
+            await displayPolls(); // Update the displayed polls after deleting
+            alert('Poll deleted successfully!');
+          } else {
+            try {
+              const data = await response.json();
+              alert(`Error: ${data.error}`);
+            } catch (error) {
+              alert('Error parsing the response JSON.');
+            }
+          }
+        } catch (error) {
+          alert(error.message);
+        }
+      };
+    
+      // Display existing polls when the page loads
+      displayPolls();
+    });
+    
+  </script>
+</body>
+</html>
